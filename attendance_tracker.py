@@ -130,45 +130,6 @@ def print_text_chart(records, overall, target_percentage=TARGET_PERCENTAGE, bar_
     print()
 
 
-def plot_attendance_chart(records, overall, target_percentage=TARGET_PERCENTAGE):
-    """Bar chart with matplotlib, shown in a window (nothing is saved)."""
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print("matplotlib is not installed, so the graph was skipped.")
-        print("Install it with:  pip install matplotlib\n")
-        return
-
-    items = records + [overall]
-    names = [i["subject"] for i in items]
-    values = [i["percentage"] for i in items]
-    colors = []
-    for item in items:
-        if item["status"] == "SHORTAGE ALERT":
-            colors.append("#d9534f")   # red
-        elif item["status"] == "NO DATA":
-            colors.append("#999999")   # grey
-        else:
-            colors.append("#5cb85c")   # green
-    colors[-1] = "#337ab7" if overall["status"] != "SHORTAGE ALERT" else "#a94442"
-
-    fig, ax = plt.subplots(figsize=(max(6, 1.2 * len(items) + 2), 5))
-    bars = ax.bar(names, values, color=colors)
-    ax.axhline(target_percentage, color="black", linestyle="--", linewidth=1,
-               label=f"Target ({target_percentage:g}%)")
-    for bar, value in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2, value + 1, f"{value:.1f}%",
-                ha="center", va="bottom", fontsize=9)
-
-    ax.set_ylim(0, 110)
-    ax.set_ylabel("Attendance (%)")
-    ax.set_title("Attendance by Subject")
-    ax.legend(loc="lower right")
-    plt.xticks(rotation=30, ha="right")
-    plt.tight_layout()
-    plt.show()
-
-
 def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     """Print a structured summary table, overall percentage, and alert summary."""
     overall = calculate_overall(records, target_percentage)
@@ -263,9 +224,6 @@ def main():
 
     overall = display_attendance_report(subjects_data)
     print_text_chart(subjects_data, overall)
-
-    if input("Show graph window? (y/n): ").strip().lower() == "y":
-        plot_attendance_chart(subjects_data, overall)
 
 
 if __name__ == "__main__":
