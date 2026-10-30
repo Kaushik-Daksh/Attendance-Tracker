@@ -72,7 +72,7 @@ def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
     Overall attendance, respecting BOTH rules: the target must hold in every
     subject AND overall.
 
-    - Percentage: total attended / total conducted (weighted, matches the portal).
+    - Percentage: total attended / total conducted.
     - Recovery: the sum of each short subject's recovery classes. Once every
       subject is at the target, the overall figure is automatically at the target.
     - Safe skips: the sum of each subject's safe skips, capped by what the overall
