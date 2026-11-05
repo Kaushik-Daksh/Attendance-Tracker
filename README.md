@@ -1,28 +1,28 @@
 # Student Attendance Tracker & Recovery Report
 
-A Python-based attendance tracking tool that helps university students monitor subject-wise attendance, identify shortages, calculate recovery requirements, and estimate how many upcoming classes they can safely miss while maintaining the required attendance percentage.
+A Python-based attendance tracking tool that helps university students monitor attendance across multiple subjects, identify shortages, calculate recovery requirements, and estimate how many upcoming classes they can safely miss while maintaining the required attendance percentage.
 
 Developed as a university group assignment using Python.
 
 ## Features
 
 - **Subject-wise Attendance Tracking:** Calculate attendance percentages for multiple subjects in a single session.
-- **Shortage Detection:** Identify subjects that fall below the target attendance threshold of 75%.
-- **Recovery Planning:** Calculate the number of consecutive classes that must be attended to reach the target.
-- **Safe Skip Estimation:** Estimate how many upcoming classes can be missed without falling below the required threshold.
-- **Overall Attendance Analysis:** Calculate weighted overall attendance and generate an overall recovery plan.
-- **Terminal Attendance Chart:** Display visual progress bars for each subject and overall attendance, with a marker showing the target percentage.
-- **Optional Graphical Report:** Generate a Matplotlib bar chart comparing subject-wise attendance against the target.
-- **Color-Coded Feedback:** Use terminal colors to distinguish attendance levels in the text chart.
-- **Input Validation:** Reject invalid numbers, negative class counts, empty subject names, and attendance counts exceeding classes conducted.
+- **Shortage Detection:** Identify subjects that fall below the default target attendance threshold of 75%.
+- **Recovery Planning:** Calculate the minimum number of consecutive classes that must be attended to reach the target percentage.
+- **Safe-Skip Estimation:** Estimate how many upcoming classes can be missed without falling below the target.
+- **Overall Attendance Analysis:** Calculate weighted overall attendance and generate recovery and safe-skip recommendations while accounting for subject-wise requirements.
+- **Terminal Attendance Chart:** Display progress bars for each subject and overall attendance, with a marker indicating the target percentage.
+- **Colour-Coded Feedback:** Use red, yellow, and green terminal colours to distinguish attendance levels when the output is displayed in a compatible terminal.
+- **Input Validation:** Reject invalid numbers, negative class counts, empty subject names, and attendance counts exceeding the number of classes conducted.
 - **Summary Report:** Display attendance percentages, shortage alerts, recovery recommendations, and summary metrics.
 
 ## Technologies Used
 
 - **Language:** Python 3
 - **Standard Libraries:** `math`, `os`, `sys`
-- **Optional Library:** `matplotlib` for graphical charts
 - **Interface:** Command-line interface (CLI)
+
+The project uses Python's standard library and does not require external packages.
 
 ## Getting Started
 
@@ -30,8 +30,6 @@ Developed as a university group assignment using Python.
 
 - Python 3 installed on your computer.
 - A terminal or command prompt.
-
-Matplotlib is optional. The tracker works without it and will still display the terminal report and text-based attendance chart.
 
 ### Installation
 
@@ -59,33 +57,21 @@ If `python` does not work on Windows, try:
 py attendance_tracker.py
 ```
 
-### Optional: Enable Graphical Charts
-
-Install Matplotlib using:
-
-```bash
-python -m pip install matplotlib
-```
-
-If Matplotlib is installed, the program can display a graphical attendance chart when prompted. Otherwise, the program skips the graphical chart and continues normally.
-
 ## How to Use
 
 1. Run the Python program.
 2. Enter the name of a subject.
-3. Enter the total number of classes conducted.
+3. Enter the total number of classes conducted for that subject.
 4. Enter the number of classes attended.
 5. Choose whether to add another subject.
-6. Review the generated attendance report and terminal chart.
-7. Choose whether to open the optional graphical chart.
-
-The program then calculates subject-wise attendance, identifies shortages, and provides recommendations based on the target attendance percentage.
+6. Repeat the process for each subject you want to track.
+7. Review the subject-wise attendance report, overall attendance summary, and terminal chart.
 
 ## How It Works
 
 ### 1. Attendance Percentage
 
-The attendance percentage is calculated using:
+For each subject, attendance is calculated using:
 
 \[
 \text{Attendance \%} =
@@ -93,17 +79,21 @@ The attendance percentage is calculated using:
 \times 100
 \]
 
+If no classes have been conducted, the program reports `NO DATA` and displays an attendance percentage of 0%.
+
 ### 2. Recovery Calculation
 
-If attendance is below the target, the program calculates the minimum number of consecutive classes that must be attended to reach the required percentage.
+If attendance is below the target, the program calculates the smallest number of consecutive classes that must be attended to reach the target percentage.
 
-### 3. Safe Skip Calculation
+### 3. Safe-Skip Calculation
 
-If attendance meets or exceeds the target, the program estimates the maximum number of upcoming classes that can be missed before attendance falls below the threshold.
+If attendance meets or exceeds the target, the program estimates the maximum number of upcoming classes that can be missed before attendance falls below the target.
 
 ### 4. Overall Attendance
 
-The overall percentage is calculated using total classes attended divided by total classes conducted across all subjects. Recovery and safe-skip recommendations also account for individual subject requirements.
+The overall attendance percentage is calculated using the total number of classes attended divided by the total number of classes conducted across all subjects.
+
+The overall recovery recommendation accounts for every subject that is below the target. When all subjects meet the target, the overall safe-skip recommendation is limited by both the individual subject limits and the overall attendance limit.
 
 ## Project Structure
 
@@ -119,15 +109,16 @@ The application checks that:
 
 - Subject names are not empty.
 - Class counts are valid non-negative integers.
-- Attended classes do not exceed classes conducted.
-- The target attendance percentage is between 0% and 100%, exclusive.
+- Attended classes do not exceed the number of classes conducted.
+- The target attendance percentage used by the calculation functions is between 0% and 100%, exclusive.
 
 ## Scope and Limitations
 
 - Attendance data is entered manually.
 - Data is not saved between program executions.
-- Graphical charts require the optional Matplotlib dependency.
-- Attendance recommendations are mathematical estimates and assume the stated class counts are accurate.
+- The default target attendance percentage is set to 75%.
+- The terminal chart uses colour only when the output is connected to a terminal that supports it.
+- Attendance recommendations are mathematical estimates and assume the entered class counts are accurate.
 - Official university attendance records and attendance policies take precedence over the application's recommendations.
 
 ## Learning Outcomes
@@ -137,9 +128,9 @@ This project demonstrates practical applications of:
 - Python functions and modular programming.
 - Conditional statements and loops.
 - Input validation and exception handling.
-- Mathematical calculations using `math`.
+- Mathematical calculations using the `math` module.
 - Lists and dictionaries for managing subject data.
-- Formatted terminal output and basic data visualization.
+- Formatted terminal output and basic text-based data visualization.
 - Git and GitHub for collaborative project development.
 
 ## Academic Context
