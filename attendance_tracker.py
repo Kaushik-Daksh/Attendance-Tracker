@@ -1,16 +1,11 @@
 import math
-import os
-import sys
-
-TARGET_PERCENTAGE = 75.0
-
-# ANSI colours for the terminal chart (disabled automatically if output is piped)
-RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"
-if os.name == "nt":
-    os.system("")  # enables ANSI colour support in the Windows console
 
 
-def colour_for(percentage, target_percentage=TARGET_PERCENTAGE):
+TARGET_PERCENTAGE = 75.0  #Target attendance percentage ALWAYS keep (0,100) or Error. (100 is divide by zero error)
+
+RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"  #ANSI color codes for terminal output
+
+def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    #Defines colour of graph
     """Red below target, yellow from target up to target + 5, green above."""
     if percentage < target_percentage:
         return RED
@@ -18,21 +13,12 @@ def colour_for(percentage, target_percentage=TARGET_PERCENTAGE):
         return YELLOW
     return GREEN
 
+def calculate_attendance(subject_name, conducted, attended, target_percentage=TARGET_PERCENTAGE):
 
-def calculate_attendance_metrics(subject_name, conducted, attended,
-                                 target_percentage=TARGET_PERCENTAGE):
-    """
-    Core engine:
-    1. Percentage calculation
-    2. Shortage identification (below target)
-    3. Alert generation
-    4. Recovery logic (consecutive classes needed to reach target)
-    5. Safe margin logic (classes that can be skipped while staying at target)
-    """
-    p = target_percentage
-    if not 0 < p < 100:
-        raise ValueError("target_percentage must be between 0 and 100 (exclusive).")
+    """Calculate percentage, identify shortage, generate alert, calculate recovery logic and safe margin logic"""
+    #Feeds into records
 
+    p = target_percentage #always keep between 0 and 100
     percentage = (attended / conducted * 100.0) if conducted > 0 else 0.0
 
     required_classes = 0
@@ -46,9 +32,10 @@ def calculate_attendance_metrics(subject_name, conducted, attended,
         # Smallest x such that (a + x) / (c + x) >= p / 100
         required_classes = math.ceil((p * conducted - 100 * attended) / (100 - p))
         action = f"SHORTAGE! Must attend the NEXT {required_classes} consecutive classes."
+
     else:
         status = "SAFE"
-        # Largest s such that a / (c + s) >= p / 100
+        # Largest x such that a / (c + x) >= p / 100
         safe_skips = math.floor((100 * attended - p * conducted) / p)
         if safe_skips == 0:
             action = "On the margin. Do not miss any upcoming classes."
@@ -56,32 +43,22 @@ def calculate_attendance_metrics(subject_name, conducted, attended,
             action = f"Can safely skip the NEXT {safe_skips} classes."
 
     return {
-        "subject": subject_name,
-        "conducted": conducted,
-        "attended": attended,
-        "percentage": round(percentage, 2),
-        "status": status,
-        "required_classes": required_classes,
-        "safe_skips": safe_skips,
-        "action": action,
-    }
-
+            "subject": subject_name,
+            "conducted": conducted,
+            "attended": attended,
+            "percentage": round(percentage, 2),
+            "status": status,
+            "required_classes": required_classes,
+            "safe_skips": safe_skips,
+            "action": action,
+        }
 
 def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
-    """
-    Overall attendance, respecting BOTH rules: the target must hold in every
-    subject AND overall.
+    """Overall attendance: percentage, status, recovery and safe skips summed per subject."""
 
-    - Percentage: total attended / total conducted.
-    - Recovery: the sum of each short subject's recovery classes. Once every
-      subject is at the target, the overall figure is automatically at the target.
-    - Safe skips: the sum of each subject's safe skips, capped by what the overall
-      figure can afford. Skipping more than this would break at least one rule.
-    """
     total_conducted = sum(r["conducted"] for r in records)
     total_attended = sum(r["attended"] for r in records)
-    overall = calculate_attendance_metrics("OVERALL", total_conducted, total_attended,
-                                           target_percentage)
+    overall = calculate_attendance("OVERALL", total_conducted, total_attended, target_percentage)
 
     short = [r for r in records if r["status"] == "SHORTAGE ALERT"]
 
@@ -90,45 +67,17 @@ def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
         overall["required_classes"] = sum(r["required_classes"] for r in short)
         overall["safe_skips"] = 0
         breakdown = ", ".join(f"{r['subject']}: {r['required_classes']}" for r in short)
-        overall["action"] = (f"SHORTAGE! Must attend {overall['required_classes']} more "
-                             f"classes in total ({breakdown}).")
+        overall["action"] = (f"SHORTAGE! Must attend {overall['required_classes']} more classes in total ({breakdown}).")
+
     elif total_conducted > 0:
         overall["status"] = "SAFE"
         overall["required_classes"] = 0
-        overall["safe_skips"] = min(sum(r["safe_skips"] for r in records),
-                                    overall["safe_skips"])
+        overall["safe_skips"] = sum(r["safe_skips"] for r in records)
         if overall["safe_skips"] == 0:
             overall["action"] = "On the margin. Do not miss any upcoming classes."
         else:
-            overall["action"] = (f"Can safely skip {overall['safe_skips']} classes in total "
-                                 f"(within each subject's own limit).")
+            overall["action"] = (f"Can safely skip {overall['safe_skips']} classes in total (within each subject's own limit).")
     return overall
-
-
-def print_text_chart(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
-    """
-    Terminal bar chart (no extra libraries needed).
-    Bar colour: red below the target, yellow up to target + 5%, green above.
-    '^' underneath marks the target position.
-    """
-    use_colour = sys.stdout.isatty()
-    target_pos = min(bar_width - 1, round(target_percentage / 100 * bar_width))
-    label_width = 14
-    print("ATTENDANCE CHART")
-    for item in records + [overall]:
-        filled = round(item["percentage"] / 100 * bar_width)
-        fill = "\u2588" * filled
-        if use_colour:
-            fill = colour_for(item["percentage"], target_percentage) + fill + RESET
-        bar = fill + "\u2591" * (bar_width - filled)
-        print(f"  {item['subject'][:label_width]:<{label_width}} {bar} "
-              f"{item['percentage']:>6.2f}%")
-        print()
-    marker = [" "] * bar_width
-    marker[target_pos] = "^"
-    print(f"  {'':<{label_width}} {''.join(marker)} target {target_percentage:g}%")
-    print()
-
 
 def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     """Print a structured summary table, overall percentage, and alert summary."""
@@ -175,7 +124,6 @@ def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     print("=" * width + "\n")
     return overall
 
-
 def read_non_negative_int(prompt):
     """Prompt until the user enters a non-negative integer."""
     while True:
@@ -189,7 +137,6 @@ def read_non_negative_int(prompt):
             continue
         return value
 
-
 def read_subject_name():
     """Prompt until the user enters a non-empty subject name."""
     while True:
@@ -198,11 +145,31 @@ def read_subject_name():
             return name
         print("Error: Subject name cannot be empty.")
 
+def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
+    """
+    Terminal bar chart (no extra libraries needed).
+    Bar colour: red below the target, yellow up to target + 5%, green above.
+    '^' underneath marks the target position.
+    """
+    target_pos = min(bar_width - 1, round(target_percentage / 100 * bar_width))
+    label_width = 14
+    print("ATTENDANCE CHART")
+    for item in records + [overall]:
+        filled = round(item["percentage"] / 100 * bar_width)
+        fill = graph_colour(item["percentage"], target_percentage) + "\u2588" * filled + RESET
+        bar = fill + "\u2591" * (bar_width - filled)
+        print(f"  {item['subject'][:label_width]:<{label_width}} {bar} "
+              f"{item['percentage']:>6.2f}%")
+        print()
+    marker = [" "] * bar_width
+    marker[target_pos] = "^"
+    print(f"  {'':<{label_width}} {''.join(marker)} target {target_percentage:g}%")
+    print()
 
 def main():
     """Interactive driver."""
     print("Welcome to the Student Attendance Tracker!")
-    subjects_data = []
+    records = []
 
     while True:
         print("\n--- Enter Subject Details ---")
@@ -216,18 +183,15 @@ def main():
                 continue
             break
 
-        subjects_data.append(calculate_attendance_metrics(name, conducted, attended))
+        records.append(calculate_attendance(name, conducted, attended))
 
         more = input("\nAdd another subject? (y/n): ").strip().lower()
         if more != "y":
             break
 
-    overall = display_attendance_report(subjects_data)
-    print_text_chart(subjects_data, overall)
+    overall = display_attendance_report(records)
+    print_graph(records, overall)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except (KeyboardInterrupt, EOFError):
-        print("\nExiting.")
+    main()
