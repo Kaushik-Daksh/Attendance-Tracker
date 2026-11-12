@@ -5,6 +5,30 @@ TARGET_PERCENTAGE = 75.0  #Target attendance percentage ALWAYS keep (0,100) or E
 
 RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"  #ANSI color codes for terminal output
 
+PRESETS = {
+    "btech cse": [
+        "Calculus",
+        "Digital Design",
+        "Web Development",
+        "Python",
+        "Environmental Science",
+    ],
+    "btech ece": [
+        "ECE Sub 1",
+        "ECE Sub 2",
+        "ECE Sub 3",
+        "ECE Sub 4",
+        "ECE Sub 5",
+    ],
+    "law": [
+        "Law Sub 1",
+        "Law Sub 2",
+        "Law Sub 3",
+        "Law Sub 4",
+        "Law Sub 5",
+    ],
+}
+
 def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    #Defines colour of graph
     """Red below target, yellow from target up to target + 5, green above."""
     if percentage < target_percentage:
@@ -145,6 +169,54 @@ def read_subject_name():
             return name
         print("Error: Subject name cannot be empty.")
 
+def collect_custom_records():
+    """Custom mode: take one subject's details at a time, then ask whether to add another."""
+    records = []
+    while True:
+        print("\n--- Enter Subject Details ---")
+        name = read_subject_name()
+        records.append(read_subject_data(name))
+
+        more = input("\nAdd another subject? (y/n): ").strip().lower()
+        if more != "y":
+            break
+    return records
+
+def choose_subjects(presets):
+    """Show numbered presets; return the chosen preset's subjects, or None for custom."""
+    names = list(presets)
+    custom_option = len(names) + 1
+
+    print("\nAvailable presets:")
+    for number, name in enumerate(names, start=1):
+        print(f"  {number}. {name.upper()}  ({', '.join(presets[name])})")
+    print(f"  {custom_option}. CUSTOM  (enter your own subjects)")
+
+    while True:
+        raw = input("\nPlease enter the desired number of the preset: ").strip()
+        if not raw.isdigit():
+            print("Error: Please enter a valid number from the list.")
+            continue
+        choice = int(raw)
+        if 1 <= choice <= len(names):
+            name = names[choice - 1]
+            print(f"\nPreset '{name.upper()}' loaded: {len(presets[name])} subjects.")
+            return presets[name]
+        if choice == custom_option:
+            return None
+        print(f"Error: Please enter a number between 1 and {custom_option}.")
+
+def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
+    """Read conducted/attended for one subject and return its record."""
+    print(f"\n--- {name} ---")
+    while True:
+        conducted = read_non_negative_int(f"Total Classes Conducted for '{name}': ")
+        attended = read_non_negative_int(f"Classes Attended for '{name}': ")
+        if attended > conducted:
+            print("Error: Attended classes cannot exceed total conducted classes.")
+            continue
+        return calculate_attendance(name, conducted, attended, target_percentage)
+
 def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
     """
     Terminal bar chart (no extra libraries needed).
@@ -169,25 +241,12 @@ def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width
 def main():
     """Interactive driver."""
     print("Welcome to the Student Attendance Tracker!")
-    records = []
+    subjects = choose_subjects(PRESETS)
 
-    while True:
-        print("\n--- Enter Subject Details ---")
-        name = read_subject_name()
-
-        while True:
-            conducted = read_non_negative_int(f"Total Classes Conducted for '{name}': ")
-            attended = read_non_negative_int(f"Classes Attended for '{name}': ")
-            if attended > conducted:
-                print("Error: Attended classes cannot exceed total conducted classes.")
-                continue
-            break
-
-        records.append(calculate_attendance(name, conducted, attended))
-
-        more = input("\nAdd another subject? (y/n): ").strip().lower()
-        if more != "y":
-            break
+    if subjects is None:
+        records = collect_custom_records()
+    else:
+        records = [read_subject_data(name) for name in subjects]
 
     overall = display_attendance_report(records)
     print_graph(records, overall)
