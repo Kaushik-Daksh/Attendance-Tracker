@@ -238,6 +238,88 @@ def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width
     print(f"  {'':<{label_width}} {''.join(marker)} target {target_percentage:g}%")
     print()
 
+def read_choice(prompt, low, high):
+    """Prompt until the user enters an integer between low and high (inclusive)."""
+    while True:
+        raw = input(prompt).strip()
+        if raw.isdigit() and low <= int(raw) <= high:
+            return int(raw)
+        print(f"Error: Please enter a number between {low} and {high}.")
+
+def read_subject_selection(records):
+    """Prompt until the user picks one or more subjects ('1,3,4' or 'all'). Returns a list of indexes."""
+    total = len(records)
+    while True:
+        raw = input("\nEnter subject numbers separated by commas (e.g. 1,3,4) or 'all': ").strip().lower()
+        if raw == "all":
+            return list(range(total))
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+        if parts and all(part.isdigit() and 1 <= int(part) <= total for part in parts):
+            indexes = []
+            for part in parts:
+                index = int(part) - 1
+                if index not in indexes:
+                    indexes.append(index)
+            return indexes
+        print(f"Error: Enter valid numbers between 1 and {total} (comma separated), or 'all'.")
+
+def read_scenario(label):
+    """Ask for scenario (skip/attend) and N. Returns (scenario, n)."""
+    print(f"\nScenario for {label}:")
+    print("  1. SKIP the next N classes")
+    print("  2. ATTEND the next N classes")
+    scenario = read_choice("Enter the scenario number: ", 1, 2)
+    n = read_non_negative_int("Enter N (number of classes): ")
+    return scenario, n
+
+def apply_scenario(record, scenario, n, target_percentage=TARGET_PERCENTAGE):
+    """Return the record that results from skipping or attending n more classes."""
+    conducted = record["conducted"] + n
+    attended = record["attended"] + (n if scenario == 2 else 0)
+    return calculate_attendance(record["subject"], conducted, attended, target_percentage)
+
+def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
+    """What-if for one or many subjects at once, plus the effect on the overall attendance."""
+    print("\n--- WHAT-IF CALCULATOR ---")
+    for number, item in enumerate(records, start=1):
+        print(f"  {number}. {item['subject']}  ({item['percentage']:.2f}%)")
+
+    selected = read_subject_selection(records)
+
+    # One scenario (skip/attend + N) is applied to every selected subject.
+    scenario, n = read_scenario("the selected subjects" if len(selected) > 1 else f"'{records[selected[0]]['subject']}'")
+
+    new_records = list(records)
+    for index in selected:
+        new_records[index] = apply_scenario(records[index], scenario, n, target_percentage)
+
+    width = 80
+    print("\n" + "=" * width)
+    print("WHAT-IF RESULTS".center(width))
+    print("=" * width)
+    print(f"{'Subject':<22}{'Scenario':<14}{'Before':<10}{'After':<10}{'Change':<10}{'Status'}")
+    print("-" * width)
+    label = f"{'Skip' if scenario == 1 else 'Attend'} {n}"
+    for index in selected:
+        before, after = records[index], new_records[index]
+        print(f"{before['subject'][:20]:<22}{label:<14}"
+              f"{before['percentage']:>6.2f}%   "
+              f"{after['percentage']:>6.2f}%   "
+              f"{after['percentage'] - before['percentage']:>+6.2f}%   "
+              f"{after['status']}")
+        print(f"    -> {after['action']}")
+
+    old_overall = calculate_overall(records, target_percentage)
+    new_overall = calculate_overall(new_records, target_percentage)
+    print("-" * width)
+    print(f"{'OVERALL':<22}{'':<14}"
+          f"{old_overall['percentage']:>6.2f}%   "
+          f"{new_overall['percentage']:>6.2f}%   "
+          f"{new_overall['percentage'] - old_overall['percentage']:>+6.2f}%   "
+          f"{new_overall['status']}")
+    print(f"    -> {new_overall['action']}")
+    print("=" * width)
+
 def main():
     """Interactive driver."""
     print("Welcome to the Student Attendance Tracker!")
@@ -250,6 +332,21 @@ def main():
 
     overall = display_attendance_report(records)
     print_graph(records, overall)
+
+    while True:
+        print("\n--- MENU ---")
+        print("  1. What-if calculator")
+        print("  2. Show report again")
+        print("  3. Exit")
+        option = read_choice("Enter your choice: ", 1, 3)
+        if option == 1:
+            what_if_calculator(records)
+        elif option == 2:
+            display_attendance_report(records)
+            print_graph(records, overall)
+        else:
+            print("Goodbye!")
+            break
 
 
 if __name__ == "__main__":
