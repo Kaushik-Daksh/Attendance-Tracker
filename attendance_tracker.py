@@ -5,6 +5,7 @@ TARGET_PERCENTAGE = 75.0  #Target attendance percentage ALWAYS keep (0,100) or E
 
 RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"  #ANSI color codes for terminal output
 
+# Preset classes for subjects
 PRESETS = {
     "btech cse": [
         "Calculus",
@@ -38,6 +39,7 @@ def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    #Defines c
     return GREEN
 
 def calculate_attendance(subject_name, conducted, attended, target_percentage=TARGET_PERCENTAGE):
+    #calculate attendance per subject
 
     """Calculate percentage, identify shortage, generate alert, calculate recovery logic and safe margin logic"""
     #Feeds into records
@@ -78,6 +80,7 @@ def calculate_attendance(subject_name, conducted, attended, target_percentage=TA
         }
 
 def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
+    #calculate final overall attendance, Function important mainly for recovery plan and safe skips, not for percentage calculation.
     """Overall attendance: percentage, status, recovery and safe skips summed per subject."""
 
     total_conducted = sum(r["conducted"] for r in records)
@@ -104,6 +107,7 @@ def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
     return overall
 
 def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
+    #attendance report summary table, overall percentage, and alert summary
     """Print a structured summary table, overall percentage, and alert summary."""
     overall = calculate_overall(records, target_percentage)
     width = 80
@@ -149,6 +153,7 @@ def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     return overall
 
 def read_non_negative_int(prompt):
+    #to read attended and conducted classes.
     """Prompt until the user enters a non-negative integer."""
     while True:
         try:
