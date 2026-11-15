@@ -2,6 +2,8 @@ import math
 
 
 TARGET_PERCENTAGE = 75.0  #Target attendance percentage ALWAYS keep (0,100) or Error. (100 is divide by zero error)
+if not 0 < TARGET_PERCENTAGE < 100:
+    raise ValueError("TARGET_PERCENTAGE must be strictly between 0 and 100.")
 
 RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"  #ANSI color codes for terminal output
 
@@ -191,6 +193,11 @@ def collect_custom_records():
     while True:
         print("\n--- Enter Subject Details ---")
         name = read_subject_name()
+
+        if any(r["subject"].casefold() == name.casefold() for r in records):
+            print("Error: That subject was already entered.")
+            continue
+
         records.append(read_subject_data(name))
 
         more = input("\nAdd another subject? (y/n): ").strip().lower()
