@@ -174,6 +174,17 @@ def read_subject_name():
             return name
         print("Error: Subject name cannot be empty.")
 
+def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
+    """Read conducted/attended for one subject and return its record."""
+    print(f"\n--- {name} ---")
+    while True:
+        conducted = read_non_negative_int(f"Total Classes Conducted for '{name}': ")
+        attended = read_non_negative_int(f"Classes Attended for '{name}': ")
+        if attended > conducted:
+            print("Error: Attended classes cannot exceed total conducted classes.")
+            continue
+        return calculate_attendance(name, conducted, attended, target_percentage)
+
 def collect_custom_records():
     """Custom mode: take one subject's details at a time, then ask whether to add another."""
     records = []
@@ -211,16 +222,6 @@ def choose_subjects(presets):
             return None
         print(f"Error: Please enter a number between 1 and {custom_option}.")
 
-def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
-    """Read conducted/attended for one subject and return its record."""
-    print(f"\n--- {name} ---")
-    while True:
-        conducted = read_non_negative_int(f"Total Classes Conducted for '{name}': ")
-        attended = read_non_negative_int(f"Classes Attended for '{name}': ")
-        if attended > conducted:
-            print("Error: Attended classes cannot exceed total conducted classes.")
-            continue
-        return calculate_attendance(name, conducted, attended, target_percentage)
 
 def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
     """
