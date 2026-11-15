@@ -192,6 +192,7 @@ The target percentage is a constant (`TARGET_PERCENTAGE`) and must stay strictly
 - The what-if calculator applies the same scenario (skip or attend, and the same N) to all selected subjects in one run.
 - Colours use ANSI escape codes and are always printed. Terminals that do not support them may show stray characters instead of colours.
 - Attendance recommendations are mathematical estimates and assume the entered class counts are accurate.
+- Display rounding: A subject at 74.996% shows as 75.00% but is marked SHORTAGE.
 - Official university attendance records and attendance policies take precedence over the application's recommendations.
 
 ## Learning Outcomes
