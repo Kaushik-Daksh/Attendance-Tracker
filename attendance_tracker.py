@@ -20,13 +20,17 @@ def validate_target(value):
 
 validate_target(TARGET_PERCENTAGE)   # checks the default constant once, at start-up
 
-# ANSI colour codes for terminal output
-RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"
+# ANSI colour / style codes for terminal output
+RED, YELLOW, GREEN, CYAN = "\033[31m", "\033[33m", "\033[32m", "\033[36m"
+BOLD, DIM, RESET = "\033[1m", "\033[2m", "\033[0m"
 if os.name == "nt":
     os.system("")   # switches on ANSI colour support in the Windows terminal
 
 # Block characters used to draw the bar chart
 FILL_CHAR, EMPTY_CHAR = "\u2588", "\u2591"
+
+# Colour used for each status word in the report
+STATUS_COLOURS = {"SAFE": GREEN, "SHORTAGE ALERT": RED, "NO DATA": DIM}
 
 # Preset classes for subjects
 PRESETS = {
@@ -55,6 +59,16 @@ PRESETS = {
 
 
 # ---------------------------------------------------------------------------
+# COLOUR HELPER
+# ---------------------------------------------------------------------------
+
+def paint(text, *styles):
+    """Wrap text in colour/style codes. Pad the text BEFORE painting it
+    (e.g. paint(f"{x:<12}", CYAN)), because the hidden colour codes would break alignment."""
+    return "".join(styles) + str(text) + RESET
+
+
+# ---------------------------------------------------------------------------
 # INPUT HELPERS (every user input goes through one of these, so bad input never crashes the program)
 # ---------------------------------------------------------------------------
 
@@ -64,13 +78,13 @@ def read_non_negative_int(prompt, maximum=MAX_CLASSES):
         try:
             value = int(input(prompt))
         except ValueError:
-            print("Error: Please enter a valid integer.")
+            print(paint("Error: Please enter a valid integer.", RED))
             continue
         if value < 0:
-            print("Error: Values cannot be negative.")
+            print(paint("Error: Values cannot be negative.", RED))
             continue
         if value > maximum:
-            print(f"Error: Value is too large (maximum allowed is {maximum}).")
+            print(paint(f"Error: Value is too large (maximum allowed is {maximum}).", RED))
             continue
         return value
 
@@ -81,7 +95,7 @@ def read_choice(prompt, low, high):
         raw = input(prompt).strip()
         if raw.isdecimal() and low <= int(raw) <= high:
             return int(raw)
-        print(f"Error: Please enter a number between {low} and {high}.")
+        print(paint(f"Error: Please enter a number between {low} and {high}.", RED))
 
 
 def read_yes_no(prompt):
@@ -92,7 +106,7 @@ def read_yes_no(prompt):
             return True
         if answer in ("n", "no"):
             return False
-        print("Error: Please enter 'y' or 'n'.")
+        print(paint("Error: Please enter 'y' or 'n'.", RED))
 
 
 def read_subject_name():
@@ -100,11 +114,11 @@ def read_subject_name():
     while True:
         name = input("Subject Name: ").strip()
         if not name:
-            print("Error: Subject name cannot be empty.")
+            print(paint("Error: Subject name cannot be empty.", RED))
         elif len(name) > MAX_NAME_LENGTH:
-            print(f"Error: Subject name cannot be longer than {MAX_NAME_LENGTH} characters.")
+            print(paint(f"Error: Subject name cannot be longer than {MAX_NAME_LENGTH} characters.", RED))
         elif name.casefold() == "overall":
-            print("Error: 'OVERALL' is reserved for the total row. Choose another name.")
+            print(paint("Error: 'OVERALL' is reserved for the total row. Choose another name.", RED))
         else:
             return name
 
@@ -119,12 +133,12 @@ def read_target_percentage(default=TARGET_PERCENTAGE):
         try:
             value = round(float(raw.rstrip("%").strip()), 2)
         except ValueError:
-            print("Error: Please enter a valid number (example: 75 or 80.5).")
+            print(paint("Error: Please enter a valid number (example: 75 or 80.5).", RED))
             continue
         try:
             return validate_target(value)
         except ValueError:
-            print("Error: Target must be strictly between 0 and 100 (0 and 100 themselves are not allowed).")
+            print(paint("Error: Target must be strictly between 0 and 100 (0 and 100 themselves are not allowed).", RED))
 
 
 # ---------------------------------------------------------------------------
@@ -225,49 +239,55 @@ def recalculate_records(records, target_percentage):
 # REPORT AND CHART
 # ---------------------------------------------------------------------------
 
+def print_report_row(item, target_percentage, bold=False):
+    """Print one coloured table row (a subject or the OVERALL line) plus its action line.
+    Percentage uses the same colour as the chart; status and the '->' arrow use the status colour."""
+    status_colour = STATUS_COLOURS[item["status"]]
+    name_style = BOLD if bold else ""
+    print(paint(f"{item['subject']:<22}", name_style)
+          + f"{item['conducted']:<12}"
+          + f"{item['attended']:<11}"
+          + paint(f"{item['percentage']:>6.2f}%", BOLD, graph_colour(item["percentage"], target_percentage))
+          + "      "
+          + paint(item["status"], BOLD, status_colour))
+    print("    " + paint("->", status_colour) + " " + paint(item["action"], DIM))
+
+
 def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     """Print a structured summary table, overall percentage, and alert summary."""
     overall = calculate_overall(records, target_percentage)
     width = 80
-    print("\n" + "=" * width)
-    print("STUDENT ATTENDANCE TRACKER & RECOVERY REPORT".center(width))
-    print("=" * width)
-    print(f"{'Subject':<22}{'Conducted':<12}{'Attended':<11}{'Percentage':<13}{'Status'}")
-    print("-" * width)
+    print("\n" + paint("=" * width, CYAN))
+    print(paint("STUDENT ATTENDANCE TRACKER & RECOVERY REPORT".center(width), BOLD, CYAN))
+    print(paint("=" * width, CYAN))
+    print(paint(f"{'Subject':<22}{'Conducted':<12}{'Attended':<11}{'Percentage':<13}{'Status'}", BOLD, CYAN))
+    print(paint("-" * width, CYAN))
 
     shortage_list = []
 
     for item in records:
-        print(f"{item['subject']:<22}"
-              f"{item['conducted']:<12}"
-              f"{item['attended']:<11}"
-              f"{item['percentage']:>6.2f}%     "
-              f"{item['status']}")
-        print(f"    -> {item['action']}")
+        print_report_row(item, target_percentage)
 
         if item["status"] == "SHORTAGE ALERT":
             shortage_list.append(item["subject"])
 
-    print("-" * width)
-    print(f"{'OVERALL':<22}"
-          f"{overall['conducted']:<12}"
-          f"{overall['attended']:<11}"
-          f"{overall['percentage']:>6.2f}%     "
-          f"{overall['status']}")
-    print(f"    -> {overall['action']}")
-    print("-" * width)
-    print("SUMMARY METRICS:")
-    print(f"  Target Threshold       : {target_percentage:g}%")
-    print(f"  Total Subjects Tracked : {len(records)}")
-    print(f"  Subjects Below Target  : {len(shortage_list)}")
+    print(paint("-" * width, CYAN))
+    print_report_row(overall, target_percentage, bold=True)
+    print(paint("-" * width, CYAN))
+
+    print(paint("SUMMARY METRICS:", BOLD, CYAN))
+    print(f"  Target Threshold       : {paint(f'{target_percentage:g}%', BOLD)}")
+    print(f"  Total Subjects Tracked : {paint(len(records), BOLD)}")
+    below_colour = RED if shortage_list else GREEN
+    print(f"  Subjects Below Target  : {paint(len(shortage_list), BOLD, below_colour)}")
 
     if shortage_list:
-        print(f"  Subjects Needing Action: {', '.join(shortage_list)}")
-        print("  WARNING: Attendance shortage detected. Follow the recovery plan above.")
+        print(f"  Subjects Needing Action: {paint(', '.join(shortage_list), BOLD, RED)}")
+        print(paint("  WARNING: Attendance shortage detected. Follow the recovery plan above.", RED))
     else:
-        print("  STATUS: All subjects meet or exceed the target.")
+        print(paint("  STATUS: All subjects meet or exceed the target.", GREEN))
 
-    print("=" * width + "\n")
+    print(paint("=" * width, CYAN) + "\n")
     return overall
 
 
@@ -279,7 +299,7 @@ def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width
     """
     target_pos = max(0, min(bar_width - 1, round(target_percentage / 100 * bar_width)))
     label_width = MAX_NAME_LENGTH
-    print("ATTENDANCE CHART")
+    print(paint("ATTENDANCE CHART", BOLD, CYAN))
     for item in records + [overall]:
         filled = max(0, min(bar_width, round(item["percentage"] / 100 * bar_width)))
         fill = graph_colour(item["percentage"], target_percentage) + FILL_CHAR * filled + RESET
@@ -299,12 +319,12 @@ def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width
 
 def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
     """Read conducted/attended for one subject and return its record."""
-    print(f"\n--- {name} ---")
+    print(paint(f"\n--- {name} ---", BOLD, CYAN))
     while True:
         conducted = read_non_negative_int(f"Total Classes Conducted for '{name}': ")
         attended = read_non_negative_int(f"Classes Attended for '{name}': ")
         if attended > conducted:
-            print("Error: Attended classes cannot exceed total conducted classes.")
+            print(paint("Error: Attended classes cannot exceed total conducted classes.", RED))
             continue
         return calculate_attendance(name, conducted, attended, target_percentage)
 
@@ -313,11 +333,11 @@ def collect_custom_records(target_percentage=TARGET_PERCENTAGE):
     """Custom mode: take one subject's details at a time, then ask whether to add another."""
     records = []
     while True:
-        print("\n--- Enter Subject Details ---")
+        print(paint("\n--- Enter Subject Details ---", BOLD, CYAN))
         name = read_subject_name()
 
         if any(r["subject"].casefold() == name.casefold() for r in records):
-            print("Error: That subject was already entered.")
+            print(paint("Error: That subject was already entered.", RED))
             continue
 
         records.append(read_subject_data(name, target_percentage))
@@ -332,16 +352,16 @@ def choose_subjects(presets):
     names = list(presets)
     custom_option = len(names) + 1
 
-    print("\nAvailable presets:")
+    print(paint("\nAvailable presets:", BOLD, CYAN))
     for number, name in enumerate(names, start=1):
-        print(f"  {number}. {name.upper()}  ({', '.join(presets[name])})")
-    print(f"  {custom_option}. CUSTOM  (enter your own subjects)")
+        print(f"  {paint(number, BOLD, YELLOW)}. {paint(name.upper(), BOLD)}  ({', '.join(presets[name])})")
+    print(f"  {paint(custom_option, BOLD, YELLOW)}. {paint('CUSTOM', BOLD)}  (enter your own subjects)")
 
     choice = read_choice("\nPlease enter the desired number of the preset: ", 1, custom_option)
     if choice == custom_option:
         return None
     name = names[choice - 1]
-    print(f"\nPreset '{name.upper()}' loaded: {len(presets[name])} subjects.")
+    print(paint(f"\nPreset '{name.upper()}' loaded: {len(presets[name])} subjects.", GREEN))
     return presets[name]
 
 
@@ -353,19 +373,19 @@ def update_subject(records, target_percentage=TARGET_PERCENTAGE):
     """Pick a subject, then either add new classes or correct its totals.
     Changes records in place. Returns True if something was changed."""
     if not records:
-        print("\nNo subjects to update.")
+        print(paint("\nNo subjects to update.", YELLOW))
         return False
 
-    print("\n--- UPDATE A SUBJECT ---")
+    print(paint("\n--- UPDATE A SUBJECT ---", BOLD, CYAN))
     for number, item in enumerate(records, start=1):
-        print(f"  {number}. {item['subject']}  "
+        print(f"  {paint(number, BOLD, YELLOW)}. {item['subject']}  "
               f"(attended {item['attended']}/{item['conducted']}, {item['percentage']:.2f}%)")
     index = read_choice("Enter the subject number: ", 1, len(records)) - 1
     old = records[index]
 
     print(f"\nUpdating '{old['subject']}':")
-    print("  1. ADD new classes (classes held since your last update)")
-    print("  2. CORRECT the totals (overwrite conducted and attended)")
+    print(f"  {paint(1, BOLD, YELLOW)}. ADD new classes (classes held since your last update)")
+    print(f"  {paint(2, BOLD, YELLOW)}. CORRECT the totals (overwrite conducted and attended)")
     mode = read_choice("Enter your choice: ", 1, 2)
 
     if mode == 1:
@@ -374,7 +394,7 @@ def update_subject(records, target_percentage=TARGET_PERCENTAGE):
             present = read_non_negative_int("How many of those did you attend: ")
             if present <= held:
                 break
-            print("Error: You cannot attend more classes than were conducted.")
+            print(paint("Error: You cannot attend more classes than were conducted.", RED))
         new = calculate_attendance(old["subject"],
                                    old["conducted"] + held,
                                    old["attended"] + present,
@@ -383,12 +403,14 @@ def update_subject(records, target_percentage=TARGET_PERCENTAGE):
         new = read_subject_data(old["subject"], target_percentage)
 
     if new["conducted"] == old["conducted"] and new["attended"] == old["attended"]:
-        print("\nNo change made.")
+        print(paint("\nNo change made.", YELLOW))
         return False
 
     records[index] = new
-    print(f"\n{new['subject']}: {old['percentage']:.2f}% -> {new['percentage']:.2f}%  ({new['status']})")
-    print(f"    -> {new['action']}")
+    new_text = paint(f"{new['percentage']:.2f}%", BOLD, graph_colour(new["percentage"], target_percentage))
+    status_text = paint(new["status"], BOLD, STATUS_COLOURS[new["status"]])
+    print(f"\n{new['subject']}: {old['percentage']:.2f}% -> {new_text}  ({status_text})")
+    print("    " + paint("->", STATUS_COLOURS[new["status"]]) + " " + paint(new["action"], DIM))
     return True
 
 
@@ -411,14 +433,14 @@ def read_subject_selection(records):
                 if index not in indexes:
                     indexes.append(index)
             return indexes
-        print(f"Error: Enter valid numbers between 1 and {total} (comma separated), or 'all'.")
+        print(paint(f"Error: Enter valid numbers between 1 and {total} (comma separated), or 'all'.", RED))
 
 
 def read_scenario(label):
     """Ask for scenario (skip/attend) and N. Returns (scenario, n)."""
     print(f"\nScenario for {label}:")
-    print("  1. SKIP the next N classes")
-    print("  2. ATTEND the next N classes")
+    print(f"  {paint(1, BOLD, YELLOW)}. SKIP the next N classes")
+    print(f"  {paint(2, BOLD, YELLOW)}. ATTEND the next N classes")
     scenario = read_choice("Enter the scenario number: ", 1, 2)
     n = read_non_negative_int("Enter N (number of classes): ")
     return scenario, n
@@ -431,15 +453,29 @@ def apply_scenario(record, scenario, n, target_percentage=TARGET_PERCENTAGE):
     return calculate_attendance(record["subject"], conducted, attended, target_percentage)
 
 
+def print_what_if_row(name, label, before, after, status, action, target_percentage, bold=False):
+    """Print one coloured What-If row. The 'Change' column is green if attendance went up, red if down."""
+    change = after - before
+    change_colour = GREEN if change >= 0 else RED
+    status_colour = STATUS_COLOURS[status]
+    print(paint(f"{name[:20]:<22}", BOLD if bold else "")
+          + f"{label:<14}"
+          + f"{before:>6.2f}%   "
+          + paint(f"{after:>6.2f}%", BOLD, graph_colour(after, target_percentage)) + "   "
+          + paint(f"{change:>+6.2f}%", change_colour) + "   "
+          + paint(status, BOLD, status_colour))
+    print("    " + paint("->", status_colour) + " " + paint(action, DIM))
+
+
 def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
     """What-if for one or many subjects at once, plus the effect on the overall attendance."""
     if not records:
-        print("\nNo subjects to analyse.")
+        print(paint("\nNo subjects to analyse.", YELLOW))
         return
 
-    print("\n--- WHAT-IF CALCULATOR ---")
+    print(paint("\n--- WHAT-IF CALCULATOR ---", BOLD, CYAN))
     for number, item in enumerate(records, start=1):
-        print(f"  {number}. {item['subject']}  ({item['percentage']:.2f}%)")
+        print(f"  {paint(number, BOLD, YELLOW)}. {item['subject']}  ({item['percentage']:.2f}%)")
 
     selected = read_subject_selection(records)
 
@@ -451,31 +487,23 @@ def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
         new_records[index] = apply_scenario(records[index], scenario, n, target_percentage)
 
     width = 80
-    print("\n" + "=" * width)
-    print("WHAT-IF RESULTS".center(width))
-    print("=" * width)
-    print(f"{'Subject':<22}{'Scenario':<14}{'Before':<10}{'After':<10}{'Change':<10}{'Status'}")
-    print("-" * width)
+    print("\n" + paint("=" * width, CYAN))
+    print(paint("WHAT-IF RESULTS".center(width), BOLD, CYAN))
+    print(paint("=" * width, CYAN))
+    print(paint(f"{'Subject':<22}{'Scenario':<14}{'Before':<10}{'After':<10}{'Change':<10}{'Status'}", BOLD, CYAN))
+    print(paint("-" * width, CYAN))
     label = f"{'Skip' if scenario == 1 else 'Attend'} {n}"
     for index in selected:
         before, after = records[index], new_records[index]
-        print(f"{before['subject'][:20]:<22}{label:<14}"
-              f"{before['percentage']:>6.2f}%   "
-              f"{after['percentage']:>6.2f}%   "
-              f"{after['percentage'] - before['percentage']:>+6.2f}%   "
-              f"{after['status']}")
-        print(f"    -> {after['action']}")
+        print_what_if_row(before["subject"], label, before["percentage"], after["percentage"],
+                          after["status"], after["action"], target_percentage)
 
     old_overall = calculate_overall(records, target_percentage)
     new_overall = calculate_overall(new_records, target_percentage)
-    print("-" * width)
-    print(f"{'OVERALL':<22}{'':<14}"
-          f"{old_overall['percentage']:>6.2f}%   "
-          f"{new_overall['percentage']:>6.2f}%   "
-          f"{new_overall['percentage'] - old_overall['percentage']:>+6.2f}%   "
-          f"{new_overall['status']}")
-    print(f"    -> {new_overall['action']}")
-    print("=" * width)
+    print(paint("-" * width, CYAN))
+    print_what_if_row("OVERALL", "", old_overall["percentage"], new_overall["percentage"],
+                      new_overall["status"], new_overall["action"], target_percentage, bold=True)
+    print(paint("=" * width, CYAN))
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +512,7 @@ def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
 
 def main():
     """Interactive driver."""
-    print("Welcome to the Student Attendance Tracker!")
+    print(paint("Welcome to the Student Attendance Tracker!", BOLD, CYAN))
     target = read_target_percentage()
     subjects = choose_subjects(PRESETS)
 
@@ -497,12 +525,10 @@ def main():
     print_graph(records, overall, target)
 
     while True:
-        print("\n--- MENU ---")
-        print("  1. What-if calculator")
-        print("  2. Show report again")
-        print("  3. Update a subject")
-        print("  4. Change target percentage")
-        print("  5. Exit")
+        print(paint("\n--- MENU ---", BOLD, CYAN))
+        for number, text in enumerate(["What-if calculator", "Show report again", "Update a subject",
+                                       "Change target percentage", "Exit"], start=1):
+            print(f"  {paint(number, BOLD, YELLOW)}. {text}")
         option = read_choice("Enter your choice: ", 1, 5)
         if option == 1:
             what_if_calculator(records, target)
@@ -517,7 +543,7 @@ def main():
             overall = display_attendance_report(records, target)
             print_graph(records, overall, target)
         else:
-            print("Goodbye!")
+            print(paint("Goodbye!", GREEN))
             break
 
 
