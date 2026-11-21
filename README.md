@@ -12,7 +12,8 @@ Developed as a university group assignment using Python.
 - **Recovery Planning:** Calculate the minimum number of consecutive classes that must be attended to reach the target percentage.
 - **Safe-Skip Estimation:** Estimate how many upcoming classes can be missed without falling below the target.
 - **What-If Calculator:** Pick one, several, or all subjects and see how attendance changes if you skip or attend the next N classes, including the effect on overall attendance.
-- **Menu-Driven Interface:** After the first report, a menu lets you run the what-if calculator as many times as you like, view the report again, or exit.
+- **Menu-Driven Interface:** After the first report, a menu lets you run the what-if calculator as many times as you like, view the report again, update a subject's data, or exit.
+- **Update Subject Data:** Keep your numbers current during a session by adding newly conducted classes to a subject, or fix a typing mistake by correcting its totals. The report, chart, and recommendations reflect the change.
 - **Overall Attendance Analysis:** Calculate overall attendance across all subjects, with a combined recovery or safe-skip recommendation built from the subject-wise results.
 - **Terminal Attendance Chart:** Display a progress bar for each subject and for overall attendance, with a `^` marker showing the target percentage.
 - **Colour-Coded Feedback:** Bars are red below the target, yellow from the target up to 5 points above it, and green beyond that.
@@ -71,7 +72,8 @@ py attendance_tracker.py
 5. Use the menu that appears after the report:
    - **1. What-if calculator**
    - **2. Show report again**
-   - **3. Exit**
+   - **3. Update a subject**
+   - **4. Exit**
 
 ### Using the What-If Calculator
 
@@ -82,7 +84,7 @@ py attendance_tracker.py
 3. Enter N, the number of classes.
 4. A results table shows each selected subject's attendance before and after, the change, and its new status with a recovery or safe-skip recommendation. An **OVERALL** row shows the combined effect on overall attendance.
 
-The what-if calculator only shows a projection. It does not change your entered attendance data, so you can try as many combinations as you like.
+The what-if calculator only shows a projection. It does not change your entered attendance data, so you can try as many combinations as you like. To actually change your data, use **Update a subject** (see below).
 
 Example output:
 
@@ -96,6 +98,23 @@ Digital Design        Skip 3         90.00%    69.23%   -20.77%   SHORTAGE ALERT
 --------------------------------------------------------------------------------
 OVERALL                              86.67%    78.79%    -7.88%   SHORTAGE ALERT
     -> SHORTAGE! Must attend 8 more classes in total (Calculus: 5, Digital Design: 3).
+```
+
+### Using Update a Subject
+
+1. Choose **3. Update a subject** from the menu and enter the number of the subject you want to change. The list shows each subject's current attended/conducted counts and percentage.
+2. Choose how to update it:
+   - **1. Add new classes:** Enter how many new classes were conducted and how many of them you attended. These are added to the existing totals.
+   - **2. Correct the totals:** Re-enter the total classes conducted and classes attended from scratch. Use this to fix a typing mistake.
+3. The program shows the subject's percentage before and after, with its new status and recovery or safe-skip recommendation. If the numbers did not change, it reports "No change made."
+
+The updated numbers are used for the rest of the session. The what-if calculator works from them, and **Show report again** recalculates the overall attendance and redraws the chart each time.
+
+Example output (Calculus at 15/20 attended, after adding 5 new classes that were all attended):
+
+```text
+Calculus: 75.00% -> 80.00%  (SAFE)
+    -> Can safely skip the NEXT 1 classes.
 ```
 
 ### Available Presets
@@ -164,6 +183,13 @@ For each selected subject, the calculator adjusts the class counts and then reru
 
 The new percentage, status, and recovery or safe-skip recommendation are computed from these projected counts. Subjects that were not selected keep their current values, and the overall figures are recalculated from the combined result.
 
+### 6. Updating a Subject
+
+When a subject is updated, its record is rebuilt and the same calculations described above are rerun:
+
+- **Add new classes:** If $h$ new classes were conducted and $p$ of them were attended (with $p \leq h$), conducted becomes $c + h$ and attended becomes $a + p$.
+- **Correct the totals:** The old counts are replaced by the newly entered values (attended cannot exceed conducted).
+
 ## Project Structure
 
 ```text
@@ -181,13 +207,15 @@ The application checks that:
 - Attended classes do not exceed the number of classes conducted.
 - The preset selection is a valid number from the list.
 - The menu choice, scenario choice, and what-if subject selection are valid numbers from their lists (subject numbers must be within range and comma separated, or `all`).
+- The subject number and update option chosen in **Update a subject** are valid numbers from their lists, the new-class counts are non-negative integers, and attended classes never exceed classes conducted.
 
 The target percentage is a constant (`TARGET_PERCENTAGE`) and must stay strictly between 0 and 100. A value of 100 causes a divide-by-zero error in the recovery calculation, and the program does not check this at runtime.
 
 ## Scope and Limitations
 
 - Attendance data is entered manually.
-- Data is not saved between program executions, and subjects entered in custom mode are not stored as presets.
+- Data is not saved between program executions, so updates made with **Update a subject** last only for the current session, and subjects entered in custom mode are not stored as presets.
+- Subjects cannot be added or removed after the initial entry. Only the numbers of existing subjects can be updated.
 - The target attendance percentage is fixed at 75% and is changed by editing `TARGET_PERCENTAGE` in the code.
 - The what-if calculator applies the same scenario (skip or attend, and the same N) to all selected subjects in one run.
 - Colours use ANSI escape codes and are always printed. Terminals that do not support them may show stray characters instead of colours.
