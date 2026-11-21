@@ -1,11 +1,32 @@
 import math
+import os
 
 
-TARGET_PERCENTAGE = 75.0  #Target attendance percentage ALWAYS keep (0,100) or Error. (100 is divide by zero error)
-if not 0 < TARGET_PERCENTAGE < 100:
-    raise ValueError("TARGET_PERCENTAGE must be strictly between 0 and 100.")
+TARGET_PERCENTAGE = 75.0   # DEFAULT target attendance percentage (must be strictly between 0 and 100)
+MAX_CLASSES = 10000        # Upper limit for any class count typed by the user (blocks absurd / overflow values)
+MAX_NAME_LENGTH = 20       # Longest allowed subject name (keeps the report tables aligned)
 
-RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"  #ANSI color codes for terminal output
+
+def validate_target(value):
+    """Raise ValueError unless value is a real number strictly between 0 and 100.
+    0 would make 'safe skips' divide by zero, 100 would make 'required classes' divide by zero."""
+    if (isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not 0 < value < 100):
+        raise ValueError("Target percentage must be a number strictly between 0 and 100.")
+    return value
+
+
+validate_target(TARGET_PERCENTAGE)   # checks the default constant once, at start-up
+
+# ANSI colour codes for terminal output
+RED, YELLOW, GREEN, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[0m"
+if os.name == "nt":
+    os.system("")   # switches on ANSI colour support in the Windows terminal
+
+# Block characters used to draw the bar chart
+FILL_CHAR, EMPTY_CHAR = "\u2588", "\u2591"
 
 # Preset classes for subjects
 PRESETS = {
@@ -32,7 +53,85 @@ PRESETS = {
     ],
 }
 
-def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    #Defines colour of graph
+
+# ---------------------------------------------------------------------------
+# INPUT HELPERS (every user input goes through one of these, so bad input never crashes the program)
+# ---------------------------------------------------------------------------
+
+def read_non_negative_int(prompt, maximum=MAX_CLASSES):
+    """Prompt until the user enters an integer between 0 and maximum."""
+    while True:
+        try:
+            value = int(input(prompt))
+        except ValueError:
+            print("Error: Please enter a valid integer.")
+            continue
+        if value < 0:
+            print("Error: Values cannot be negative.")
+            continue
+        if value > maximum:
+            print(f"Error: Value is too large (maximum allowed is {maximum}).")
+            continue
+        return value
+
+
+def read_choice(prompt, low, high):
+    """Prompt until the user enters an integer between low and high (inclusive)."""
+    while True:
+        raw = input(prompt).strip()
+        if raw.isdecimal() and low <= int(raw) <= high:
+            return int(raw)
+        print(f"Error: Please enter a number between {low} and {high}.")
+
+
+def read_yes_no(prompt):
+    """Prompt until the user answers y or n. Returns True for yes."""
+    while True:
+        answer = input(prompt).strip().lower()
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Error: Please enter 'y' or 'n'.")
+
+
+def read_subject_name():
+    """Prompt until the user enters a valid subject name."""
+    while True:
+        name = input("Subject Name: ").strip()
+        if not name:
+            print("Error: Subject name cannot be empty.")
+        elif len(name) > MAX_NAME_LENGTH:
+            print(f"Error: Subject name cannot be longer than {MAX_NAME_LENGTH} characters.")
+        elif name.casefold() == "overall":
+            print("Error: 'OVERALL' is reserved for the total row. Choose another name.")
+        else:
+            return name
+
+
+def read_target_percentage(default=TARGET_PERCENTAGE):
+    """Prompt until the user enters a target strictly between 0 and 100 (just Enter keeps the default).
+    Accepts '80' or '80%'. The value is rounded to 2 decimal places."""
+    while True:
+        raw = input(f"Enter target attendance % (press Enter to keep {default:g}%): ").strip()
+        if raw == "":
+            return default
+        try:
+            value = round(float(raw.rstrip("%").strip()), 2)
+        except ValueError:
+            print("Error: Please enter a valid number (example: 75 or 80.5).")
+            continue
+        try:
+            return validate_target(value)
+        except ValueError:
+            print("Error: Target must be strictly between 0 and 100 (0 and 100 themselves are not allowed).")
+
+
+# ---------------------------------------------------------------------------
+# CALCULATIONS
+# ---------------------------------------------------------------------------
+
+def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    # Defines colour of graph
     """Red below target, yellow from target up to target + 5, green above."""
     if percentage < target_percentage:
         return RED
@@ -40,13 +139,22 @@ def graph_colour(percentage, target_percentage=TARGET_PERCENTAGE):    #Defines c
         return YELLOW
     return GREEN
 
+
 def calculate_attendance(subject_name, conducted, attended, target_percentage=TARGET_PERCENTAGE):
-    #calculate attendance per subject
-
     """Calculate percentage, identify shortage, generate alert, calculate recovery logic and safe margin logic"""
-    #Feeds into records
+    # Defensive checks: the input functions already prevent these, but the maths must never get bad data
+    validate_target(target_percentage)
+    if conducted < 0 or attended < 0:
+        raise ValueError("Class counts cannot be negative.")
+    if attended > conducted:
+        raise ValueError("Attended classes cannot exceed conducted classes.")
 
-    p = target_percentage #always keep between 0 and 100
+    # Turn the target into a whole number (2 decimals max): 75.0 -> 7500, 70.1 -> 7010.
+    # Doing the maths with integers means float rounding can never make the answer off by one class.
+    P = round(target_percentage * 100)
+    if not 1 <= P <= 9999:
+        raise ValueError("Target percentage is too close to 0 or 100.")
+
     percentage = (attended / conducted * 100.0) if conducted > 0 else 0.0
 
     required_classes = 0
@@ -55,36 +163,34 @@ def calculate_attendance(subject_name, conducted, attended, target_percentage=TA
     if conducted == 0:
         status = "NO DATA"
         action = "No classes conducted yet."
-    elif attended * 100 < p * conducted:
+    elif attended * 10000 < P * conducted:
         status = "SHORTAGE ALERT"
-        # Smallest x such that (a + x) / (c + x) >= p / 100
-        required_classes = math.ceil((p * conducted - 100 * attended) / (100 - p))
+        # Smallest x such that (a + x) / (c + x) >= P / 10000, using integer ceiling division: -(-a // b)
+        required_classes = -(-(P * conducted - 10000 * attended) // (10000 - P))
         action = f"SHORTAGE! Must attend the NEXT {required_classes} consecutive classes."
-
     else:
         status = "SAFE"
-        # Largest x such that a / (c + x) >= p / 100
-        safe_skips = math.floor((100 * attended - p * conducted) / p)
+        # Largest x such that a / (c + x) >= P / 10000, using integer floor division: a // b
+        safe_skips = (10000 * attended - P * conducted) // P
         if safe_skips == 0:
             action = "On the margin. Do not miss any upcoming classes."
         else:
             action = f"Can safely skip the NEXT {safe_skips} classes."
 
     return {
-            "subject": subject_name,
-            "conducted": conducted,
-            "attended": attended,
-            "percentage": round(percentage, 2),
-            "status": status,
-            "required_classes": required_classes,
-            "safe_skips": safe_skips,
-            "action": action,
-        }
+        "subject": subject_name,
+        "conducted": conducted,
+        "attended": attended,
+        "percentage": round(percentage, 2),
+        "status": status,
+        "required_classes": required_classes,
+        "safe_skips": safe_skips,
+        "action": action,
+    }
+
 
 def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
-    #calculate final overall attendance, Function important mainly for recovery plan and safe skips, not for percentage calculation.
     """Overall attendance: percentage, status, recovery and safe skips summed per subject."""
-
     total_conducted = sum(r["conducted"] for r in records)
     total_attended = sum(r["attended"] for r in records)
     overall = calculate_attendance("OVERALL", total_conducted, total_attended, target_percentage)
@@ -96,7 +202,7 @@ def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
         overall["required_classes"] = sum(r["required_classes"] for r in short)
         overall["safe_skips"] = 0
         breakdown = ", ".join(f"{r['subject']}: {r['required_classes']}" for r in short)
-        overall["action"] = (f"SHORTAGE! Must attend {overall['required_classes']} more classes in total ({breakdown}).")
+        overall["action"] = f"SHORTAGE! Must attend {overall['required_classes']} more classes in total ({breakdown})."
 
     elif total_conducted > 0:
         overall["status"] = "SAFE"
@@ -105,11 +211,21 @@ def calculate_overall(records, target_percentage=TARGET_PERCENTAGE):
         if overall["safe_skips"] == 0:
             overall["action"] = "On the margin. Do not miss any upcoming classes."
         else:
-            overall["action"] = (f"Can safely skip {overall['safe_skips']} classes in total (within each subject's own limit).")
+            overall["action"] = f"Can safely skip {overall['safe_skips']} classes in total (within each subject's own limit)."
     return overall
 
+
+def recalculate_records(records, target_percentage):
+    """Rebuild every record so status, recovery and safe skips match a new target."""
+    return [calculate_attendance(r["subject"], r["conducted"], r["attended"], target_percentage)
+            for r in records]
+
+
+# ---------------------------------------------------------------------------
+# REPORT AND CHART
+# ---------------------------------------------------------------------------
+
 def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
-    #attendance report summary table, overall percentage, and alert summary
     """Print a structured summary table, overall percentage, and alert summary."""
     overall = calculate_overall(records, target_percentage)
     width = 80
@@ -154,37 +270,32 @@ def display_attendance_report(records, target_percentage=TARGET_PERCENTAGE):
     print("=" * width + "\n")
     return overall
 
-def read_non_negative_int(prompt):
-    #to read attended and conducted classes.
-    """Prompt until the user enters a non-negative integer."""
-    while True:
-        try:
-            value = int(input(prompt))
-        except ValueError:
-            print("Error: Please enter a valid integer.")
-            continue
-        if value < 0:
-            print("Error: Values cannot be negative.")
-            continue
-        return value
 
-def read_subject_name():
-    """Prompt until the user enters a non-empty subject name."""
-    while True:
-        name = input("Subject Name: ").strip()
-        if name:
-            return name
-        print("Error: Subject name cannot be empty.")
+def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
+    """
+    Terminal bar chart (no extra libraries needed).
+    Bar colour: red below the target, yellow up to target + 5%, green above.
+    '^' underneath marks the target position.
+    """
+    target_pos = max(0, min(bar_width - 1, round(target_percentage / 100 * bar_width)))
+    label_width = MAX_NAME_LENGTH
+    print("ATTENDANCE CHART")
+    for item in records + [overall]:
+        filled = max(0, min(bar_width, round(item["percentage"] / 100 * bar_width)))
+        fill = graph_colour(item["percentage"], target_percentage) + FILL_CHAR * filled + RESET
+        bar = fill + EMPTY_CHAR * (bar_width - filled)
+        print(f"  {item['subject'][:label_width]:<{label_width}} {bar} "
+              f"{item['percentage']:>6.2f}%")
+        print()
+    marker = [" "] * bar_width
+    marker[target_pos] = "^"
+    print(f"  {'':<{label_width}} {''.join(marker)} target {target_percentage:g}%")
+    print()
 
-def read_yes_no(prompt):
-    """Prompt until the user answers y or n. Returns True for yes."""
-    while True:
-        answer = input(prompt).strip().lower()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        print("Error: Please enter 'y' or 'n'.")
+
+# ---------------------------------------------------------------------------
+# DATA ENTRY
+# ---------------------------------------------------------------------------
 
 def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
     """Read conducted/attended for one subject and return its record."""
@@ -197,7 +308,8 @@ def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
             continue
         return calculate_attendance(name, conducted, attended, target_percentage)
 
-def collect_custom_records():
+
+def collect_custom_records(target_percentage=TARGET_PERCENTAGE):
     """Custom mode: take one subject's details at a time, then ask whether to add another."""
     records = []
     while True:
@@ -208,12 +320,12 @@ def collect_custom_records():
             print("Error: That subject was already entered.")
             continue
 
-        records.append(read_subject_data(name))
+        records.append(read_subject_data(name, target_percentage))
 
-        more = input("\nAdd another subject? (y/n): ").strip().lower()
-        if more != "y":
+        if not read_yes_no("\nAdd another subject? (y/n): "):
             break
     return records
+
 
 def choose_subjects(presets):
     """Show numbered presets; return the chosen preset's subjects, or None for custom."""
@@ -225,19 +337,12 @@ def choose_subjects(presets):
         print(f"  {number}. {name.upper()}  ({', '.join(presets[name])})")
     print(f"  {custom_option}. CUSTOM  (enter your own subjects)")
 
-    while True:
-        raw = input("\nPlease enter the desired number of the preset: ").strip()
-        if not raw.isdigit():
-            print("Error: Please enter a valid number from the list.")
-            continue
-        choice = int(raw)
-        if 1 <= choice <= len(names):
-            name = names[choice - 1]
-            print(f"\nPreset '{name.upper()}' loaded: {len(presets[name])} subjects.")
-            return presets[name]
-        if choice == custom_option:
-            return None
-        print(f"Error: Please enter a number between 1 and {custom_option}.")
+    choice = read_choice("\nPlease enter the desired number of the preset: ", 1, custom_option)
+    if choice == custom_option:
+        return None
+    name = names[choice - 1]
+    print(f"\nPreset '{name.upper()}' loaded: {len(presets[name])} subjects.")
+    return presets[name]
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +352,10 @@ def choose_subjects(presets):
 def update_subject(records, target_percentage=TARGET_PERCENTAGE):
     """Pick a subject, then either add new classes or correct its totals.
     Changes records in place. Returns True if something was changed."""
+    if not records:
+        print("\nNo subjects to update.")
+        return False
+
     print("\n--- UPDATE A SUBJECT ---")
     for number, item in enumerate(records, start=1):
         print(f"  {number}. {item['subject']}  "
@@ -283,34 +392,9 @@ def update_subject(records, target_percentage=TARGET_PERCENTAGE):
     return True
 
 
-def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
-    """
-    Terminal bar chart (no extra libraries needed).
-    Bar colour: red below the target, yellow up to target + 5%, green above.
-    '^' underneath marks the target position.
-    """
-    target_pos = min(bar_width - 1, round(target_percentage / 100 * bar_width))
-    label_width = 14
-    print("ATTENDANCE CHART")
-    for item in records + [overall]:
-        filled = round(item["percentage"] / 100 * bar_width)
-        fill = graph_colour(item["percentage"], target_percentage) + "\u2588" * filled + RESET
-        bar = fill + "\u2591" * (bar_width - filled)
-        print(f"  {item['subject'][:label_width]:<{label_width}} {bar} "
-              f"{item['percentage']:>6.2f}%")
-        print()
-    marker = [" "] * bar_width
-    marker[target_pos] = "^"
-    print(f"  {'':<{label_width}} {''.join(marker)} target {target_percentage:g}%")
-    print()
-
-def read_choice(prompt, low, high):
-    """Prompt until the user enters an integer between low and high (inclusive)."""
-    while True:
-        raw = input(prompt).strip()
-        if raw.isdigit() and low <= int(raw) <= high:
-            return int(raw)
-        print(f"Error: Please enter a number between {low} and {high}.")
+# ---------------------------------------------------------------------------
+# WHAT-IF CALCULATOR
+# ---------------------------------------------------------------------------
 
 def read_subject_selection(records):
     """Prompt until the user picks one or more subjects ('1,3,4' or 'all'). Returns a list of indexes."""
@@ -320,7 +404,7 @@ def read_subject_selection(records):
         if raw == "all":
             return list(range(total))
         parts = [part.strip() for part in raw.split(",") if part.strip()]
-        if parts and all(part.isdigit() and 1 <= int(part) <= total for part in parts):
+        if parts and all(part.isdecimal() and 1 <= int(part) <= total for part in parts):
             indexes = []
             for part in parts:
                 index = int(part) - 1
@@ -328,6 +412,7 @@ def read_subject_selection(records):
                     indexes.append(index)
             return indexes
         print(f"Error: Enter valid numbers between 1 and {total} (comma separated), or 'all'.")
+
 
 def read_scenario(label):
     """Ask for scenario (skip/attend) and N. Returns (scenario, n)."""
@@ -338,14 +423,20 @@ def read_scenario(label):
     n = read_non_negative_int("Enter N (number of classes): ")
     return scenario, n
 
+
 def apply_scenario(record, scenario, n, target_percentage=TARGET_PERCENTAGE):
     """Return the record that results from skipping or attending n more classes."""
     conducted = record["conducted"] + n
     attended = record["attended"] + (n if scenario == 2 else 0)
     return calculate_attendance(record["subject"], conducted, attended, target_percentage)
 
+
 def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
     """What-if for one or many subjects at once, plus the effect on the overall attendance."""
+    if not records:
+        print("\nNo subjects to analyse.")
+        return
+
     print("\n--- WHAT-IF CALCULATOR ---")
     for number, item in enumerate(records, start=1):
         print(f"  {number}. {item['subject']}  ({item['percentage']:.2f}%)")
@@ -386,37 +477,53 @@ def what_if_calculator(records, target_percentage=TARGET_PERCENTAGE):
     print(f"    -> {new_overall['action']}")
     print("=" * width)
 
+
+# ---------------------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------------------
+
 def main():
     """Interactive driver."""
     print("Welcome to the Student Attendance Tracker!")
+    target = read_target_percentage()
     subjects = choose_subjects(PRESETS)
 
     if subjects is None:
-        records = collect_custom_records()
+        records = collect_custom_records(target)
     else:
-        records = [read_subject_data(name) for name in subjects]
+        records = [read_subject_data(name, target) for name in subjects]
 
-    overall = display_attendance_report(records)
-    print_graph(records, overall)
+    overall = display_attendance_report(records, target)
+    print_graph(records, overall, target)
 
     while True:
         print("\n--- MENU ---")
         print("  1. What-if calculator")
         print("  2. Show report again")
         print("  3. Update a subject")
-        print("  4. Exit")
-        option = read_choice("Enter your choice: ", 1, 4)
+        print("  4. Change target percentage")
+        print("  5. Exit")
+        option = read_choice("Enter your choice: ", 1, 5)
         if option == 1:
-            what_if_calculator(records)
+            what_if_calculator(records, target)
         elif option == 2:
-            overall = display_attendance_report(records)   # recalculated every time, never stale
-            print_graph(records, overall)
+            overall = display_attendance_report(records, target)   # recalculated every time, never stale
+            print_graph(records, overall, target)
         elif option == 3:
-            update_subject(records)
+            update_subject(records, target)
+        elif option == 4:
+            target = read_target_percentage(target)
+            records = recalculate_records(records, target)   # statuses depend on the target, so rebuild them
+            overall = display_attendance_report(records, target)
+            print_graph(records, overall, target)
         else:
             print("Goodbye!")
             break
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        # Ctrl+C or closed input stream: exit cleanly instead of showing a traceback
+        print("\n\nProgram interrupted. Goodbye!")
