@@ -176,6 +176,16 @@ def read_subject_name():
             return name
         print("Error: Subject name cannot be empty.")
 
+def read_yes_no(prompt):
+    """Prompt until the user answers y or n. Returns True for yes."""
+    while True:
+        answer = input(prompt).strip().lower()
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Error: Please enter 'y' or 'n'.")
+
 def read_subject_data(name, target_percentage=TARGET_PERCENTAGE):
     """Read conducted/attended for one subject and return its record."""
     print(f"\n--- {name} ---")
@@ -228,6 +238,49 @@ def choose_subjects(presets):
         if choice == custom_option:
             return None
         print(f"Error: Please enter a number between 1 and {custom_option}.")
+
+
+# ---------------------------------------------------------------------------
+# UPDATE A SUBJECT
+# ---------------------------------------------------------------------------
+
+def update_subject(records, target_percentage=TARGET_PERCENTAGE):
+    """Pick a subject, then either add new classes or correct its totals.
+    Changes records in place. Returns True if something was changed."""
+    print("\n--- UPDATE A SUBJECT ---")
+    for number, item in enumerate(records, start=1):
+        print(f"  {number}. {item['subject']}  "
+              f"(attended {item['attended']}/{item['conducted']}, {item['percentage']:.2f}%)")
+    index = read_choice("Enter the subject number: ", 1, len(records)) - 1
+    old = records[index]
+
+    print(f"\nUpdating '{old['subject']}':")
+    print("  1. ADD new classes (classes held since your last update)")
+    print("  2. CORRECT the totals (overwrite conducted and attended)")
+    mode = read_choice("Enter your choice: ", 1, 2)
+
+    if mode == 1:
+        held = read_non_negative_int("How many new classes were conducted: ")
+        while True:
+            present = read_non_negative_int("How many of those did you attend: ")
+            if present <= held:
+                break
+            print("Error: You cannot attend more classes than were conducted.")
+        new = calculate_attendance(old["subject"],
+                                   old["conducted"] + held,
+                                   old["attended"] + present,
+                                   target_percentage)
+    else:
+        new = read_subject_data(old["subject"], target_percentage)
+
+    if new["conducted"] == old["conducted"] and new["attended"] == old["attended"]:
+        print("\nNo change made.")
+        return False
+
+    records[index] = new
+    print(f"\n{new['subject']}: {old['percentage']:.2f}% -> {new['percentage']:.2f}%  ({new['status']})")
+    print(f"    -> {new['action']}")
+    return True
 
 
 def print_graph(records, overall, target_percentage=TARGET_PERCENTAGE, bar_width=40):
@@ -350,13 +403,16 @@ def main():
         print("\n--- MENU ---")
         print("  1. What-if calculator")
         print("  2. Show report again")
-        print("  3. Exit")
-        option = read_choice("Enter your choice: ", 1, 3)
+        print("  3. Update a subject")
+        print("  4. Exit")
+        option = read_choice("Enter your choice: ", 1, 4)
         if option == 1:
             what_if_calculator(records)
         elif option == 2:
-            display_attendance_report(records)
+            overall = display_attendance_report(records)   # recalculated every time, never stale
             print_graph(records, overall)
+        elif option == 3:
+            update_subject(records)
         else:
             print("Goodbye!")
             break
