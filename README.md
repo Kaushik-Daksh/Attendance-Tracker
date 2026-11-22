@@ -19,7 +19,7 @@ Developed as a university group assignment using Python.
 - **Colourful Terminal Report:** The title, table headings, percentages, status words, menus, and error messages are all colour-coded, so the report is easy to scan.
 - **Terminal Attendance Chart:** Display a progress bar for each subject and for overall attendance, with a `^` marker showing the target percentage.
 - **Colour-Coded Feedback:** Bars and table percentages are red below the target, yellow from the target up to 5 points above it, and green beyond that. The status word is green for `SAFE` and red for `SHORTAGE ALERT`.
-- **Input Validation:** Reject invalid numbers, negative or absurdly large class counts, empty or too-long subject names, duplicate subject names, attendance counts exceeding the number of classes conducted, invalid target percentages, and invalid menu or subject selections.
+- **Input Validation:** Reject invalid numbers, negative class counts, empty or duplicate subject names, attendance counts exceeding the number of classes conducted, invalid target percentages, and invalid menu or subject selections.
 - **Summary Report:** Display attendance percentages, shortage alerts, recovery recommendations, and summary metrics.
 
 ## Technologies Used
@@ -189,7 +189,7 @@ $$
 
 If the result is 0, the subject is on the margin and no upcoming classes should be missed.
 
-The target is converted to a whole number (for example 75% becomes 7500 out of 10000) and both calculations use whole-number maths. This means floating-point rounding can never make the recovery or safe-skip answer off by one class, and the shortage check itself is exact.
+The shortage check compares `attended × 100` with `target × conducted` directly, so no division is needed to decide the status. Recovery is rounded up with `math.ceil` and safe-skip is rounded down with `math.floor`, so both answers are always whole classes.
 
 ### 4. Overall Attendance
 
@@ -229,16 +229,16 @@ Attendance-Tracker/
 
 The application checks that:
 
-- Subject names are not empty, are at most 20 characters long, are not duplicates of a subject already entered, and are not the reserved name `OVERALL`.
-- Class counts are valid non-negative integers, no larger than 10000.
+- Subject names are not empty and are not duplicates of a subject already entered (upper/lower case is ignored).
+- Class counts are valid non-negative whole numbers.
 - Attended classes do not exceed the number of classes conducted.
 - The preset selection is a valid number from the list.
 - The "add another subject" answer is `y`/`yes` or `n`/`no`.
 - The menu choice, scenario choice, and what-if subject selection are valid numbers from their lists (subject numbers must be within range and comma separated, or `all`).
 - The subject number chosen in **Update a subject** is a valid number from the list, the new totals are non-negative integers, and attended classes never exceed classes conducted.
-- The target percentage is a real number strictly between 0 and 100. 0 and 100 themselves are rejected because they would cause a divide-by-zero in the safe-skip and recovery calculations. The default `TARGET_PERCENTAGE` constant is also checked once when the program starts.
+- The target percentage is a real number strictly between 0 and 100 (a trailing `%` is allowed). 0 and 100 themselves are rejected because they would cause a divide-by-zero in the safe-skip and recovery calculations.
 
-Invalid input shows a red error message and asks again instead of crashing. Pressing Ctrl+C or closing the input stream exits cleanly with a short message.
+Invalid input shows a red error message and asks again instead of crashing.
 
 ## Scope and Limitations
 
@@ -248,7 +248,9 @@ Invalid input shows a red error message and asks again instead of crashing. Pres
 - The target attendance percentage can be changed while the program runs, but it is not remembered between runs. The default of 75% is changed permanently by editing `TARGET_PERCENTAGE` in the code.
 - Targets are rounded to 2 decimal places.
 - The what-if calculator applies the same scenario (skip or attend, and the same N) to all selected subjects in one run.
-- Subject names longer than 20 characters are not accepted, and names are cut to 20 characters in the chart labels.
+- Subject names are not shortened, so very long names can push the table and chart columns out of alignment (the name column is 22 characters wide).
+- Pressing Ctrl+C (or closing the input stream) stops the program immediately with Python's default message instead of a custom goodbye.
+- Calculations use normal floating-point numbers, so for targets with decimals (for example 80.1%), a recovery or safe-skip figure could in rare cases be off by one class.
 - Colours use ANSI escape codes and are always printed. Terminals that do not support them may show stray characters (such as `[32m`) instead of colours.
 - Attendance recommendations are mathematical estimates and assume the entered class counts are accurate.
 - Display rounding: A subject at 74.996% shows as 75.00% but is marked SHORTAGE.
@@ -262,7 +264,7 @@ This project demonstrates practical applications of:
 - Conditional statements and loops.
 - Menu-driven programs built with loops and numbered choices.
 - Input validation and exception handling.
-- Mathematical calculations using the `math` module and whole-number (integer) maths.
+- Mathematical calculations using the `math` module (`ceil` and `floor`).
 - Lists and dictionaries for managing subject data and presets.
 - Formatted terminal output, ANSI colours, and basic text-based data visualization.
 - Git and GitHub for collaborative project development.
