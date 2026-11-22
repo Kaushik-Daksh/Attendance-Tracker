@@ -370,7 +370,7 @@ def choose_subjects(presets):
 # ---------------------------------------------------------------------------
 
 def update_subject(records, target_percentage=TARGET_PERCENTAGE):
-    """Pick a subject, then either add new classes or correct its totals.
+    """Pick a subject, then re-enter its total classes conducted and classes attended.
     Changes records in place. Returns True if something was changed."""
     if not records:
         print(paint("\nNo subjects to update.", YELLOW))
@@ -383,24 +383,8 @@ def update_subject(records, target_percentage=TARGET_PERCENTAGE):
     index = read_choice("Enter the subject number: ", 1, len(records)) - 1
     old = records[index]
 
-    print(f"\nUpdating '{old['subject']}':")
-    print(f"  {paint(1, BOLD, YELLOW)}. ADD new classes (classes held since your last update)")
-    print(f"  {paint(2, BOLD, YELLOW)}. CORRECT the totals (overwrite conducted and attended)")
-    mode = read_choice("Enter your choice: ", 1, 2)
-
-    if mode == 1:
-        held = read_non_negative_int("How many new classes were conducted: ")
-        while True:
-            present = read_non_negative_int("How many of those did you attend: ")
-            if present <= held:
-                break
-            print(paint("Error: You cannot attend more classes than were conducted.", RED))
-        new = calculate_attendance(old["subject"],
-                                   old["conducted"] + held,
-                                   old["attended"] + present,
-                                   target_percentage)
-    else:
-        new = read_subject_data(old["subject"], target_percentage)
+    # Goes straight to the two questions: total conducted, then attended
+    new = read_subject_data(old["subject"], target_percentage)
 
     if new["conducted"] == old["conducted"] and new["attended"] == old["attended"]:
         print(paint("\nNo change made.", YELLOW))
