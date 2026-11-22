@@ -14,7 +14,7 @@ Developed as a university group assignment using Python.
 - **Safe-Skip Estimation:** Estimate how many upcoming classes can be missed without falling below the target.
 - **What-If Calculator:** Pick one, several, or all subjects and see how attendance changes if you skip or attend the next N classes, including the effect on overall attendance.
 - **Menu-Driven Interface:** After the first report, a menu lets you run the what-if calculator as many times as you like, view the report again, update a subject's data, change the target percentage, or exit.
-- **Update Subject Data:** Keep your numbers current during a session by adding newly conducted classes to a subject, or fix a typing mistake by correcting its totals. The report, chart, and recommendations reflect the change.
+- **Update Subject Data:** Pick a subject and re-enter its total classes conducted and classes attended, either to bring your numbers up to date during a session or to fix a typing mistake. The report, chart, and recommendations reflect the change.
 - **Overall Attendance Analysis:** Calculate overall attendance across all subjects, with a combined recovery or safe-skip recommendation built from the subject-wise results.
 - **Colourful Terminal Report:** The title, table headings, percentages, status words, menus, and error messages are all colour-coded, so the report is easy to scan.
 - **Terminal Attendance Chart:** Display a progress bar for each subject and for overall attendance, with a `^` marker showing the target percentage.
@@ -107,18 +107,16 @@ OVERALL                              89.91%    83.76%    -6.15%   SHORTAGE ALERT
 ### Using Update a Subject
 
 1. Choose **3. Update a subject** from the menu and enter the number of the subject you want to change. The list shows each subject's current attended/conducted counts and percentage.
-2. Choose how to update it:
-   - **1. Add new classes:** Enter how many new classes were conducted and how many of them you attended. These are added to the existing totals.
-   - **2. Correct the totals:** Re-enter the total classes conducted and classes attended from scratch. Use this to fix a typing mistake.
+2. The program goes straight to two questions for that subject: the total classes conducted, then the classes attended. Enter the new **totals so far**, not just the extra classes, because the old numbers are replaced.
 3. The program shows the subject's percentage before and after, with its new status and recovery or safe-skip recommendation. If the numbers did not change, it reports "No change made."
 
 The updated numbers are used for the rest of the session. The what-if calculator works from them, and **Show report again** recalculates the overall attendance and redraws the chart each time.
 
-Example output (Calculus at 15/20 attended, after adding 5 new classes that were all attended):
+Example output (Calculus at 42/44 attended, updated to 50 conducted and 44 attended, with a 75% target):
 
 ```text
-Calculus: 75.00% -> 80.00%  (SAFE)
-    -> Can safely skip the NEXT 1 classes.
+Calculus: 95.45% -> 88.00%  (SAFE)
+    -> Can safely skip the NEXT 8 classes.
 ```
 
 ### Using Change Target Percentage
@@ -213,10 +211,7 @@ The new percentage, status, and recovery or safe-skip recommendation are compute
 
 ### 6. Updating a Subject
 
-When a subject is updated, its record is rebuilt and the same calculations described above are rerun:
-
-- **Add new classes:** If $h$ new classes were conducted and $n$ of them were attended (with $n \leq h$), conducted becomes $c + h$ and attended becomes $a + n$.
-- **Correct the totals:** The old counts are replaced by the newly entered values (attended cannot exceed conducted).
+When a subject is updated, the old counts are replaced by the newly entered totals (attended cannot exceed conducted). The subject's record is then rebuilt with the same calculations described above, so its percentage, status, and recovery or safe-skip numbers always match the new totals.
 
 ### 7. Changing the Target
 
@@ -240,7 +235,7 @@ The application checks that:
 - The preset selection is a valid number from the list.
 - The "add another subject" answer is `y`/`yes` or `n`/`no`.
 - The menu choice, scenario choice, and what-if subject selection are valid numbers from their lists (subject numbers must be within range and comma separated, or `all`).
-- The subject number and update option chosen in **Update a subject** are valid numbers from their lists, the new-class counts are non-negative integers, and attended classes never exceed classes conducted.
+- The subject number chosen in **Update a subject** is a valid number from the list, the new totals are non-negative integers, and attended classes never exceed classes conducted.
 - The target percentage is a real number strictly between 0 and 100. 0 and 100 themselves are rejected because they would cause a divide-by-zero in the safe-skip and recovery calculations. The default `TARGET_PERCENTAGE` constant is also checked once when the program starts.
 
 Invalid input shows a red error message and asks again instead of crashing. Pressing Ctrl+C or closing the input stream exits cleanly with a short message.
